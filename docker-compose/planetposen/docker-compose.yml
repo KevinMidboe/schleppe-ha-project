@@ -1,0 +1,28 @@
+version: '3'
+
+services:
+  planetposen-original:
+    image: kevinmidboe/planetposen-original:latest
+    container_name: planetposen
+    restart: unless-stopped
+
+    # NETWORK
+    networks:
+      - traefik
+
+    # TRAEFIK LABELS
+    labels:
+      # Enable Traefik for this container
+      - "traefik.enable=true"
+
+      # Router definition
+      - "traefik.http.routers.planetposen-original.rule=Host(`planetposen.no`)"
+      - "traefik.http.routers.planetposen-original.entrypoints=web"
+
+      # Service definition
+      - "traefik.http.services.planetposen-original.loadbalancer.server.port=80"
+
+# NETWORK DEFINITIONS
+networks:
+  traefik:
+    external: true

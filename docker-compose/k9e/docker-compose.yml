@@ -1,0 +1,28 @@
+version: '3'
+
+services:
+  k9e:
+    image: kevinmidboe/k9e.no:latest
+    container_name: k9e
+    restart: unless-stopped
+
+    # NETWORK
+    networks:
+      - traefik
+
+    # TRAEFIK LABELS
+    labels:
+      # Enable Traefik for this container
+      - "traefik.enable=true"
+
+      # Router definition
+      - "traefik.http.routers.k9e.rule=Host(`k9e.no`)"
+      - "traefik.http.routers.k9e.entrypoints=web"
+
+      # Service definition
+      - "traefik.http.services.k9e.loadbalancer.server.port=80"
+
+# NETWORK DEFINITIONS
+networks:
+  traefik:
+    external: true

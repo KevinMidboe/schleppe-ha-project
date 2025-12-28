@@ -1,0 +1,74 @@
+version: '3'
+
+services:
+  traefik:
+    image: "traefik:latest"
+    container_name: traefik
+    restart: unless-stopped
+
+    # PORTS
+    ports:
+      # HTTP entrypoint
+      # Exposed on all external addresses (0.0.0.0:80)
+      - "80:80"
+
+      # Traefik API & Dashboard
+      # Accessible on http://<host>:8080
+      - "8080:8080"
+
+    # COMMAND (STATIC CONFIGURATION)
+    command:
+      # Enable Traefik API & Dashboard
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+
+      # Log settings
+      - "--log.level=INFO"
+      - "--accesslog=true"
+
+      # EntryPoints
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.traefik.address=:8080"
+
+      # Docker provider
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+
+      # Optional: file provider for dynamic config
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
+
+      # Global settings
+      - "--global.checknewversion=true"
+      - "--global.sendanonymoususage=false"
+
+    # VOLUMES
+    volumes:
+      # Docker socket (required for Docker provider)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+      # Dynamic configuration directory (middlewares, routers, TLS, etc.)
+      - ./dynamic:/etc/traefik/dynamic:ro
+
+      # Logs (optional)
+      - ./logs:/logs
+
+    # NETWORKS
+    networks:
+      - traefik
+
+    # LABELS (OPTIONAL SELF-ROUTING)
+    labels:
+      # Enable Traefik for this container
+      - "traefik.enable=true"
+
+      # Router for dashboard (via Traefik itself)
+      - "traefik.http.routers.traefik.rule=Host(`traefik.localhost`)"
+      - "traefik.http.routers.traefik.entrypoints=web"
+      - "traefik.http.routers.traefik.service=api@internal"
+
+# NETWORK DEFINITIONS
+networks:
+  traefik:
+    name: traefik
+    driver: bridge
