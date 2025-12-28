@@ -1,0 +1,6 @@
+name: hetzner-pulumi
+description: Manages schleppe ha project hetzner resources
+runtime:
+  name: nodejs
+  options:
+    packagemanager: yarn
