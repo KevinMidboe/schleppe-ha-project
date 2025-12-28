@@ -1,0 +1,13 @@
+---
+- name: Get openssl version
+  hosts: all
+
+  tasks:
+    - name: Gather the package facts
+      ansible.builtin.package_facts:
+        manager: auto
+
+    - name: Install openssl version 3.0.6
+      ansible.builtin.package:
+        name: openssl=3.0.6
+        state: present      

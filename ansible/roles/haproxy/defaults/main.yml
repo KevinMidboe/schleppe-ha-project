@@ -1,0 +1,3 @@
+haproxy_package_name: haproxy
+haproxy_cfg_path: /etc/haproxy/haproxy.cfg
+haproxy_service_name: haproxy

@@ -1,0 +1,17 @@
+---
+# dns_domain: "schleppe"
+dns_nameservers:
+  - "1.1.1.1"
+  - "2606:4700:4700::1111"
+  - "2606:4700:4700::1001"
+
+default_user: "kevin"
+
+# Consul cluster
+consul_datacenter: "schleppe"
+consul_servers:
+  - "10.0.0.140"
+  - "10.0.0.141"
+  - "10.0.0.142"
+consul_install_dnsmasq: false
+

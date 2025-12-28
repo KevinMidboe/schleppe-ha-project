@@ -1,0 +1,11 @@
+---
+# Specific variables for all group
+ansible_python_interpreter: '/usr/bin/python3'
+ssh_skip_ssh_config: true
+users:
+  - username: kevin
+    oh_my_zsh:
+      theme: robbyrussell
+  - username: root
+    oh_my_zsh:
+      theme: robbyrussell

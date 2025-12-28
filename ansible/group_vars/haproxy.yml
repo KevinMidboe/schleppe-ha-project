@@ -1,0 +1,12 @@
+haproxy_traefik_ip: 
+  - "10.24.1.1"
+  - "10.25.0.4"
+haproxy_traefik_port: 80
+haproxy_cookie_value: "{{ inventory_hostname | default('server-1') }}"
+haproxy_dynamic_cookie_key: "mysecretphrase"
+haproxy_stats_auth: "admin:strongpassword"
+haproxy_certs_dir: "/etc/haproxy/certs"
+
+certbot_cloudflare_secrets_dir: "/root/.secrets/certbot"
+certbot_cloudflare_ini_path: "/root/.secrets/certbot/cloudflare.ini"
+certbot_cloudflare_api_token: "REPLACE_WITH_REAL_TOKEN"

@@ -1,0 +1,7 @@
+---
+- name: create ssh server config
+  hosts: all
+  roles:
+    - role: roles/ssh
+      ssh_skip_ssh_config: true
+      ssh_skip_ssh_keys: true

@@ -1,0 +1,9 @@
+---
+- name: Install and configure systemd for varnish
+  hosts: varnish
+  roles:
+    - role: roles/firewall
+      enable_80_ufw_port: true
+      enable_443_ufw_port: true
+
+    - role: roles/varnish

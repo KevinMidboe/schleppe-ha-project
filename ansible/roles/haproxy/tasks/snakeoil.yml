@@ -1,0 +1,48 @@
+---
+# tasks/snakeoil.yml
+- name: Ensure snakeoil certificate tooling is installed
+  ansible.builtin.package:
+    name: ssl-cert
+    state: present
+
+- name: Check whether HAProxy snakeoil PEM already exists
+  ansible.builtin.stat:
+    path: /etc/haproxy/certs/ssl-cert-snakeoil.pem
+  register: haproxy_pem
+
+# Validate cert structure if the file exists
+- name: Validate certificate structure in HAProxy PEM
+  ansible.builtin.command: >
+    openssl x509 -in /etc/haproxy/certs/ssl-cert-snakeoil.pem -noout
+  register: pem_cert_check
+  changed_when: false
+  failed_when: false
+  when: haproxy_pem.stat.exists
+
+- name: Ensure HAProxy cert directory exists
+  ansible.builtin.file:
+    path: /etc/haproxy/certs
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Decide if we must (re)create PEM (missing/empty/invalid)
+  ansible.builtin.set_fact:
+    haproxy_pem_needs_create: >-
+        {{
+            (not haproxy_pem.stat.exists)
+            or ((pem_cert_check | default({'rc': 'undef'})).rc != 0)
+        }}
+
+# Generate the snakeoil cert/key if we need to (re)create bundle
+- name: Generate default snakeoil cert/key
+  ansible.builtin.command: make-ssl-cert generate-default-snakeoil
+  when: haproxy_pem_needs_create
+  changed_when: true
+
+- name: Assemble HAProxy snakeoil PEM bundle (cert + key)
+  shell:
+    cmd: "cat /etc/ssl/certs/ssl-cert-snakeoil.pem /etc/ssl/private/ssl-cert-snakeoil.key > /etc/haproxy/certs/ssl-cert-snakeoil.pem"
+  when: haproxy_pem_needs_create
+  notify: reload haproxy

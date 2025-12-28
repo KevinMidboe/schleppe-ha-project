@@ -1,0 +1,8 @@
+---
+- package:
+    name: haproxy
+    state: present
+
+- service:
+    name: haproxy
+    enabled: true

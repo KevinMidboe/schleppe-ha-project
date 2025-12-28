@@ -1,0 +1,6 @@
+---
+- name: Install vim
+  hosts: all
+  
+  roles:
+    - role: roles/vim

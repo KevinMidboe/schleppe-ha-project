@@ -1,0 +1,7 @@
+---
+- name: Install all required packages, built and start service for vault
+  hosts: all
+  roles:
+    - role: roles/vault
+    - role: roles/firewall
+      enable_vault_ufw_port: true

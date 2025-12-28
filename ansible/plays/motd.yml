@@ -1,0 +1,5 @@
+---
+- name: Generate motd figlet hostnames
+  hosts: all
+  roles:
+    - role: roles/motd

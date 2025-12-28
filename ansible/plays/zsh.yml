@@ -1,0 +1,7 @@
+- name: Install oh-my-zsh
+  hosts: all
+  roles:
+    - role: roles/oh-my-zsh
+      oh_my_zsh:
+        theme: robbyrussell
+

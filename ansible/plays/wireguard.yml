@@ -1,0 +1,6 @@
+- name: Setup wireguard
+  hosts: all
+  roles:
+    - role: roles/docker
+    - role: roles/firewall
+    - role: roles/wireguard

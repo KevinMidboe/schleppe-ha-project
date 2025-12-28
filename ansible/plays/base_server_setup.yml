@@ -1,0 +1,24 @@
+---
+- name: Check if vault is reachable for dynamic config
+  hosts: all
+  connection: local
+  gather_facts: false
+  pre_tasks:
+  - name: Check for vault env variables
+    set_fact:
+      has_vault: "{{ lookup('env', 'VAULT_ADDR') and lookup('env', 'VAULT_TOKEN') and lookup('env', 'HAS_VAULT') != 'FALSE' }}"
+  roles:
+    - { role: roles/vault-config, when: has_vault }
+
+- name: Basic setup, brute force protection, firewall and log shipping
+  hosts: all
+  roles:
+    - role: roles/apt
+    - role: roles/base                  # - Basic server setup and configuration
+    # - role: roles/fail2ban              # - SSH Brute force protection
+    # - role: roles/prox-qemu-agent       # - If proxmox vm insatll qemu agent
+    - role: roles/firewall              # - Firewall, if firewall_enable is true
+    - role: roles/ssh                   # - Sets up the ssh role, with keys, ssh_config and sshd_config
+    - role: roles/oh-my-zsh
+    - role: roles/motd
+#    - role: roles/bacula

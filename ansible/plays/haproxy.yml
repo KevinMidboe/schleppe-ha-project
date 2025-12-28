@@ -1,0 +1,7 @@
+---
+- name: Configure HAProxy edge + Certbot Cloudflare plugin
+  hosts: haproxy
+
+  roles:
+    # - role: roles/certbot
+    - role: roles/haproxy

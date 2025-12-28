@@ -1,0 +1,16 @@
+---
+- name: Check if vault is reachable for dynamic config
+  hosts: all
+  connection: local
+  gather_facts: false
+  pre_tasks:
+  - name: Check for vault env variables
+    set_fact:
+      has_vault: "{{ lookup('env', 'VAULT_ADDR') and lookup('env', 'VAULT_TOKEN') and lookup('env', 'HAS_VAULT') != 'FALSE' }}"
+  roles:
+    - { role: roles/vault-config, when: has_vault }
+
+- name: Install all bind9 service and transfer zone files
+  hosts: all
+  roles:
+    - role: roles/bind9

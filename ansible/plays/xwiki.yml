@@ -1,0 +1,21 @@
+---
+- name: Check if vault is reachable for dynamic config
+  hosts: all
+  connection: local
+  gather_facts: false
+  pre_tasks:
+  - name: Check for vault env variables
+    set_fact:
+      has_vault: "{{ lookup('env', 'VAULT_ADDR') and lookup('env', 'VAULT_TOKEN') }}"
+      XWIKI_DB_USER: "{{ lookup('env', 'XWIKI_DB_USER') }}"
+      XWIKI_DB_PASSWORD: "{{ lookup('env', 'XWIKI_DB_PASSWORD') }}"
+      XWIKI_DB_ROOT_PASSWORD: "{{ lookup('env', 'XWIKI_DB_ROOT_PASSWORD') }}"
+  roles:
+    - { role: roles/vault-config, when: has_vault }
+
+- name: Setup xwiki working directory and move docker-compose file
+  hosts: all
+  roles:
+    - role: roles/docker
+    - role: roles/firewall
+    - role: roles/xwiki

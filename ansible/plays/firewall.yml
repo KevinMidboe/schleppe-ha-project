@@ -1,0 +1,6 @@
+---
+- name: Install all ufw service and enable ports
+  hosts: all
+  roles:
+    - role: roles/firewall
+

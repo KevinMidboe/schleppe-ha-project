@@ -1,0 +1,7 @@
+---
+- name: Setup minecraft requirements w/ latest server jar
+  hosts: all
+  roles:
+    - role: roles/apt
+    - role: roles/minecraft
+

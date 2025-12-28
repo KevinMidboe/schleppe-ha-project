@@ -1,0 +1,57 @@
+---
+  - name: update apt
+    become: true
+    apt:
+      update_cache: yes
+      cache_valid_time: 86400
+
+  - name: install required packages
+    package:
+      name:
+        - debian-archive-keyring
+        - curl
+        - gnupg
+        - apt-transport-https
+
+  - name: add varnish apt key & repo
+    block:
+      - name: add varnish key
+        apt_key:
+          url: https://packagecloud.io/varnishcache/varnish60lts/gpgkey
+          state: present
+
+      - name: add varnish repo
+        apt_repository:
+          repo: 'deb https://packagecloud.io/varnishcache/varnish60lts/{{ varnish_release }} {{ varnish_release_codename }} main'
+          state: present
+
+      - name: add varnish repo src
+        apt_repository:
+          repo: 'deb-src https://packagecloud.io/varnishcache/varnish60lts/{{ varnish_release }} {{ varnish_release_codename }} main'
+          state: present
+
+      - name: update apt
+        become: true
+        apt:
+          update_cache: yes
+          cache_valid_time: 86400
+
+  - name: install varnish package
+    package:
+      name: varnish
+
+  - name: copy systemd template
+    template:
+      src: varnish-systemd.j2
+      dest: /lib/systemd/system/varnish.service
+      owner: root
+      mode: 644
+
+  - name: restart systemd daemon
+    systemd:
+      daemon_reload: yes
+
+  - name: restart varnish service
+    systemd:
+      name: varnish.service
+      state: reloaded

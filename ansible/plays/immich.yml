@@ -1,0 +1,7 @@
+---
+- name: Install and setup immich backup service
+  hosts: all
+  roles:
+    #    - role: roles/docker
+    - role: roles/immich
+

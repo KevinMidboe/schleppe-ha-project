@@ -1,0 +1,11 @@
+---
+- name: Get openssl version
+  hosts: all
+
+  tasks:
+    - name: Gather the package facts
+      ansible.builtin.package_facts:
+        manager: auto
+
+    - name: print openssl version
+      debug: var=ansible_facts.packages.openssl[0].version

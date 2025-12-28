@@ -1,0 +1,5 @@
+---
+- name: Install all required packages, built and start service for vinlottis
+  hosts: all
+  roles:
+    - role: roles/vinlottis

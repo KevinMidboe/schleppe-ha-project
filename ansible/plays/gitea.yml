@@ -1,0 +1,5 @@
+---
+- name: Provision git server with gitea
+  hosts: all
+  roles:
+    - role: roles/gitea

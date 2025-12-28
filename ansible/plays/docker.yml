@@ -1,0 +1,5 @@
+---
+- name: Install docker on linux host
+  hosts: all
+  roles:
+    - role: roles/docker
