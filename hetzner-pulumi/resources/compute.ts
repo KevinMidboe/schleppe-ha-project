@@ -13,20 +13,13 @@ const serverLabels = {
   env: pulumi.getStack(),
 };
 
-/*
-function getSshPublicKey(): hcloud.SshKey {
-  const sshPublicKey = config.require("sshPublicKey"); 
-  return sshKey;
-}
-*/
-
-  const sshPublicKey = config.require("sshPublicKey"); 
+const sshPublicKey = config.require("sshPublicKey");
   const sshKey = new hcloud.SshKey("ssh-key", {
     name: `pulumi-${pulumi.getStack()}-ssh`,
     publicKey: sshPublicKey,
   });
 
-export function genServer(
+export function server(
   name: string,
   size: VmSize,
   os: OS = OS.debian,
@@ -34,6 +27,7 @@ export function genServer(
   network: hcloud.NetworkSubnet
 ): hcloud.Server {
   const ceap = getCheapestServerType('eu');
+
   const hexId = new random.RandomId(`${name}-${location}`, {
     byteLength: 2, // 2 bytes = 4 hex characters
   });
@@ -45,6 +39,11 @@ export function genServer(
     image: os,
     serverType: ceap,
     location,
+    backups: false,
+    publicNets: [{
+        ipv4Enabled: false,
+        ipv6Enabled: true,
+    }],
     networks: [network],
     sshKeys: [sshKey.name],
     labels: serverLabels
