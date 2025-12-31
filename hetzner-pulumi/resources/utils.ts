@@ -1,4 +1,5 @@
 import * as pulumi from "@pulumi/pulumi";
+import * as hcloud from "@pulumi/hcloud";
 import { z } from "zod";
 import * as crypto from "node:crypto";
 
@@ -103,3 +104,62 @@ export function getCheapestServerType(
   });
 }
 
+interface Label {
+  role?: string
+}
+
+export function topicedLabel(name: string) {
+  let labels: Label = {};
+  if (name.includes("haproxy")) {
+    labels.role = 'load-balancer';
+  } else if (name.includes("web")) {
+    labels.role = 'web'
+  }
+
+  return labels
+}
+
+
+export const summarizeServer = (s: hcloud.Server) => ({
+  name: s.name,
+  publicIpv4: s.ipv4Address,
+  publicIpv6: s.ipv6Address,
+  privateIp: s.networks.apply(nets => nets?.[0]?.ip ?? 'null'),
+});
+
+export const summarizeNetwork = (n: hcloud.Network) => ({
+  name: n.name,
+  cidr: n.ipRange
+});
+
+export const summarizeSubNetwork = (n: hcloud.NetworkSubnet) => ({
+  gateway: n.gateway,
+  cidr: n.ipRange,
+  zone: n.networkZone,
+  type: n.type
+});
+
+export const summarizeFloatingIp = (floatingIp: hcloud.FloatingIp) => ({
+  name: floatingIp.name,
+  address: floatingIp.ipAddress,
+  attachedTo: floatingIp.serverId,
+  location: floatingIp.homeLocation,
+  labels: floatingIp.labels
+})
+
+export const summarizeFirewall = (firewall: hcloud.Firewall) => ({
+  name: firewall.name,
+  rules: firewall.rules,
+  labels: firewall.labels
+})
+
+export const summarizeDns = (firewall: hcloud.Firewall) => ({
+  name: firewall.name,
+  rules: firewall.rules,
+  labels: firewall.labels
+})
+
+export async function currentIPAddress(): Promise<string> {
+  return fetch('https://ifconfig.me/ip')
+    .then(resp => resp.text())
+}

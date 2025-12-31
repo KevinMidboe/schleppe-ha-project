@@ -2,24 +2,22 @@ import * as pulumi from "@pulumi/pulumi";
 import * as hcloud from "@pulumi/hcloud";
 
 import type { NetworkRegion } from "./types";
+import { currentIPAddress } from "./utils";
 
-// Required
-
-// make sure to have regional parent networks
-
+// NETWORKS
 const networkName = (name: string, region: NetworkRegion) =>
   `${name}-net-${region}`;
 
 export function regionalNetwork(
-  prefix: string,
+  name: string,
   cidr: string,
   region: NetworkRegion,
 ) {
-  const name = networkName(prefix, region);
-  const parentNetworkRange = 8;
+  const parentNetworkRange = 22;
   const [ip, _] = cidr.split("/");
 
   const net = new hcloud.Network(name, {
+    name,
     ipRange: `${ip}/${parentNetworkRange}`,
     labels: {
       region,
@@ -38,16 +36,33 @@ export function subNetwork(
 ): hcloud.NetworkSubnet {
   const name = `${prefix}-subnet-${region}`;
 
-  const net = new hcloud.NetworkSubnet(name, {
-    networkId: parentNetwork.id.apply(id => Number(id)),
-    type: "cloud",
-    networkZone: "eu-central",
-    ipRange: cidr,
-  });
+  const net = new hcloud.NetworkSubnet(
+    name,
+    {
+      networkId: parentNetwork.id.apply((id) => Number(id)),
+      type: "cloud",
+      networkZone: region,
+      ipRange: cidr,
+    },
+    { parent: parentNetwork, dependsOn: [parentNetwork] },
+  );
 
   return net;
 }
 
+// FLOATING IPs
+export function floatingIP(name: string, server: hcloud.Server) {
+  return new hcloud.FloatingIp(
+    name,
+    {
+      type: "ipv4",
+      serverId: server.id.apply((i) => Number(i)),
+    },
+    { dependsOn: [server] },
+  );
+}
+
+// FIREWALL RULES
 export const allowHttp = new hcloud.Firewall("allow-http", {
   name: "allow-http",
   applyTos: [
@@ -80,16 +95,30 @@ export const allowHttp = new hcloud.Firewall("allow-http", {
   ],
 });
 
-export const allowSSH = new hcloud.Firewall("allow-ssh", {
-  name: "allow-ssh",
-  rules: [
-    {
-      direction: "in",
-      protocol: "tcp",
-      port: "22",
-      sourceIps: ["127.0.0.0/24"],
-      description: "Allow SSH from approved CIDRs only",
-    },
-  ],
-});
+export function allowSSHToCurrentIP() {
+  const ip = currentIPAddress()
 
+  return new hcloud.Firewall("allow-ssh", {
+    name: "allow-ssh",
+    rules: [
+      {
+        direction: "in",
+        protocol: "tcp",
+        port: "22",
+        sourceIps: [ip],
+        description: "Allow SSH from approved CIDRs only",
+      },
+    ],
+  });
+}
+
+export function attach(
+  name: string,
+  firewall: hcloud.Firewall,
+  servers: hcloud.Server[],
+) {
+  return new hcloud.FirewallAttachment(name, {
+    firewallId: firewall.id.apply((id) => Number(id)),
+    serverIds: servers.map((server) => server.id.apply((id) => Number(id))),
+  });
+}

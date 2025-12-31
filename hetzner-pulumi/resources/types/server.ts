@@ -2,10 +2,13 @@ export enum VmSize {
   small = "small",
   medium = "medium",
   large = "large",
+  cx23 = "cx23",
+  cax11 = "cax11",
+  cpx11 = "cpx11"
 }
 
 export enum OS {
-  debian = "debian",
+  debian = "debian-13",
   ubuntu = "ubuntu",
 }
 
