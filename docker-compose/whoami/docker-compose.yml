@@ -16,7 +16,7 @@ services:
       - "traefik.enable=true"
 
       # Router definition
-      - "traefik.http.routers.whoami.rule=Host(`whoami.example.com`)"
+      - "traefik.http.routers.whoami.rule=Host(`whoami.schleppe.cloud`)"
       - "traefik.http.routers.whoami.entrypoints=web"
 
       # Service definition
