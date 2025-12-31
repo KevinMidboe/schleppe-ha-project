@@ -1,0 +1,3 @@
+local_compose_dir: "{{ playbook_dir }}/../../docker-compose"
+remote_compose_dir: /opt/docker
+

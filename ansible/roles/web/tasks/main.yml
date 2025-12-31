@@ -1,0 +1,25 @@
+- name: Ensure remote docker directory exists
+  ansible.builtin.file:
+    path: "{{ remote_compose_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Copy local docker-compose directory to remote
+  ansible.builtin.copy:
+    src: "{{ local_compose_dir }}/"
+    dest: "{{ remote_compose_dir }}/"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Ensure compose-all.sh is executable
+  ansible.builtin.file:
+    path: "{{ remote_compose_dir }}/compose-all.sh"
+    mode: '0755'
+
+- name: Run compose-all.sh up
+  ansible.builtin.command: bash compose-all.sh up
+  args:
+    chdir: "{{ remote_compose_dir }}"

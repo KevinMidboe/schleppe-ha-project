@@ -1,0 +1,6 @@
+---
+- name: copies docker-compose files to all web hosts
+  hosts: web
+  roles:
+    - role: roles/web
+
