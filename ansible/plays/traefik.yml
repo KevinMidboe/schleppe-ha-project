@@ -1,6 +1,0 @@
----
-- name: Install traefik binary & config
-  hosts: all
-  roles:
-    - role: roles/traefik
-

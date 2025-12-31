@@ -1,6 +1,0 @@
----
-# CI specific vars
-
-users:
-  - root
-ssh_keys_users: ['drone']

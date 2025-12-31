@@ -1,5 +1,0 @@
----
-- name: Install & configure syncthing
-  hosts: all
-  roles:
-    - role: roles/syncthing
