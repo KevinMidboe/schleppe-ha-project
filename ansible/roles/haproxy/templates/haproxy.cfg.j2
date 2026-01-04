@@ -35,13 +35,37 @@ defaults
     errorfile 503 /etc/haproxy/errors/503.http
     errorfile 504 /etc/haproxy/errors/504.http
 
-# Front door: public HTTP
-frontend fe_http
+# Front door: main frontend dedicated to end users
+frontend ft_web
     bind :80
 
-    http-request set-header X-Forwarded-Proto https
-    option forwardfor
+    # Cache routing acl definitions
+    acl static_content path_end .jpg .jpeg .gif .png .css .js .htm .html
+    acl pseudo_static path_end .php ! path_beg /dynamic/
+    acl image_php path_beg /images.php
+    acl varnish_available nbsrv(bk_varnish_uri) ge 1
 
+    # Caches health detection + routing decision
+    use_backend bk_varnish_uri if varnish_available static_content
+    use_backend bk_varnish_uri if varnish_available pseudo_static
+    use_backend bk_varnish_url_param if varnish_available image_php
+
+    # Read debug query parameter
+    http-request set-var(txn.debug) urlp(debug)
+    # Define what "debug enabled" means
+    acl debug_enabled var(txn.debug) -m str -i 1 true yes on
+    # Debug headers
+    http-request set-var(txn.http_ver) req.ver
+    http-response add-header X-HA-HTTP-Version	%[var(txn.http_ver)] if debug_enabled
+    http-response add-header X-HA-TLS-Version	%[ssl_fc_protocol] if debug_enabled
+    http-response add-header X-HA-Frontend	%[fe_name] if debug_enabled
+    http-response add-header X-HA-Backend  	%[be_name] if debug_enabled
+    http-response add-header X-HA-Server   	%[srv_name] if debug_enabled
+    http-response add-header X-HA-Server	%[hostname] if debug_enabled
+    http-response add-header X-Debug-Client-IP	%[src] if debug_enabled
+    http-response add-header Cache-Control	no-store if debug_enabled
+
+    # dynamic content or all caches are unavailable
     default_backend be_traefik_http
 
 # Front door: public HTTPS
@@ -58,47 +82,45 @@ frontend fe_https
     # acl is_h2 ssl_fc_alpn -i h2
     # http-response set-header Alt-Svc "h3=\":443\"; ma=900" if is_h2
 
-    # =========================================================
-    # Debug response headers (enabled via ?debug=1)
+    # Cache routing acl definitions
+    acl static_content path_end .jpg .jpeg .gif .png .css .js .htm .html
+    acl pseudo_static path_end .php ! path_beg /dynamic/
+    acl image_php path_beg /images.php
+    acl varnish_available nbsrv(bk_varnish_uri) ge 1
+
+    # Caches health detection + routing decision
+    use_backend bk_varnish_uri if varnish_available static_content
+    use_backend bk_varnish_uri if varnish_available pseudo_static
+    use_backend bk_varnish_url_param if varnish_available image_php
 
     # Read debug query parameter
     http-request set-var(txn.debug) urlp(debug)
-
     # Define what "debug enabled" means
     acl debug_enabled var(txn.debug) -m str -i 1 true yes on
-
+    # Debug headers
     http-request set-var(txn.http_ver) req.ver
-    http-response add-header X-Debug-HTTP-Version %[var(txn.http_ver)] if debug_enabled
-    http-response add-header X-Debug-Served-By haproxy-https if debug_enabled
-    http-response add-header X-Debug-Frontend %[fe_name]    if debug_enabled
-    http-response add-header X-Debug-Backend  %[be_name]    if debug_enabled
-    http-response add-header X-Debug-Server   %[srv_name]   if debug_enabled
+    http-response add-header X-HA-HTTP-Version	%[var(txn.http_ver)] if debug_enabled
+    http-response add-header X-HA-TLS-Version	%[ssl_fc_protocol] if debug_enabled
+    http-response add-header X-HA-Frontend	%[fe_name] if debug_enabled
+    http-response add-header X-HA-Backend  	%[be_name] if debug_enabled
+    http-response add-header X-HA-Server   	%[srv_name] if debug_enabled
+    http-response add-header X-HA-Server	%[hostname] if debug_enabled
+    http-response add-header X-Debug-Client-IP	%[src] if debug_enabled
+    http-response add-header Cache-Control	no-store if debug_enabled
 
-    # Client & network
-    http-response add-header X-Debug-Client-IP   %[src] if debug_enabled
-    # http-response add-header X-Debug-Client-Port %[sp]  if debug_enabled
-    # http-response add-header X-Debug-XFF %[req.hdr(X-Forwarded-For)] if debug_enabled
-
-    # TLS / HTTPS details
-    http-response add-header X-Debug-TLS %[ssl_fc] if debug_enabled
-    http-response add-header X-Debug-TLS-Version %[ssl_fc_protocol] if debug_enabled
-    http-response add-header X-Debug-TLS-Cipher  %[ssl_fc_cipher]   if debug_enabled
-
-    # Request identity & correlation
-    http-response add-header X-Debug-Request-ID %[unique-id] if debug_enabled
-    http-response add-header X-Debug-Method     %[method]   if debug_enabled
-
-    # Safety: prevent caching of debug responses
-    http-response add-header Cache-Control no-store if debug_enabled
-
+    # dynamic content or all caches are unavailable
     default_backend be_traefik_http
-
 
 # Backend: Traefik VM
 backend be_traefik_http
     mode http
     balance roundrobin
-    cookie LB_SERVER insert indirect nocache dynamic
+    # app servers must say if everything is fine on their side
+    # and they can process requests
+    option httpchk
+    option httpchk GET /appcheck
+    http-check expect rstring [oO][kK]
+    cookie LB_SERVER insert indirect nocache
     dynamic-cookie-key {{ haproxy_dynamic_cookie_key }}
 
     # Health check: Traefik should respond with 404 for unknown host; that's still "alive".
@@ -107,6 +129,39 @@ backend be_traefik_http
 
     {% for ip in haproxy_traefik_ip %}
         server traefik{{ loop.index }} {{ ip }}:{{ haproxy_traefik_port }} check cookie {{ haproxy_cookie_value }}
+    {% endfor %}
+
+# VARNISH
+# static backend with balance based on the uri, including the query string
+# to avoid caching an object on several caches
+backend bk_varnish_uri
+    balance uri # in latest HAProxy version, one can add 'whole' keyword
+
+    # Varnish must tell it's ready to accept traffic
+    option httpchk HEAD /varnishcheck
+    http-check expect status 200
+
+    # client IP information
+    option forwardfor
+
+    # avoid request redistribution when the number of caches changes (crash or start up)
+    hash-type consistent
+    {% for ip in haproxy_varnish_ip %}
+        server varnish{{ loop.index }} {{ ip }}:{{ haproxy_varnish_port }} check
+    {% endfor %}
+
+# cache backend with balance based on the value of the URL parameter called "id"
+# to avoid caching an object on several caches
+backend bk_varnish_url_param
+    balance url_param id
+
+    # client IP information
+    option forwardfor
+
+    # avoid request redistribution when the number of caches changes (crash or start up)
+    hash-type consistent
+    {% for ip in haproxy_varnish_ip %}
+        server varnish{{ loop.index }} {{ ip }}:{{ haproxy_varnish_port }} track bk_varnish_uri/varnish{{ loop.index }}
     {% endfor %}
 
 # Frontend: HAProxy prometheus exporter metrics

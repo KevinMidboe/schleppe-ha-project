@@ -1,12 +1,21 @@
-haproxy_traefik_ip: 
-  - "10.24.1.1"
-  - "10.25.0.4"
 haproxy_traefik_port: 80
+haproxy_varnish_port: 80
 haproxy_cookie_value: "{{ inventory_hostname | default('server-1') }}"
 haproxy_dynamic_cookie_key: "mysecretphrase"
 haproxy_stats_auth: "admin:strongpassword"
 haproxy_certs_dir: "/etc/haproxy/certs"
-
 certbot_cloudflare_secrets_dir: "/root/.secrets/certbot"
 certbot_cloudflare_ini_path: "/root/.secrets/certbot/cloudflare.ini"
-certbot_cloudflare_api_token: "REPLACE_WITH_REAL_TOKEN"
+haproxy_varnish_ip:
+  - 10.24.2.1
+  - 10.24.2.2
+  - 10.25.2.1
+  - 10.25.2.2
+haproxy_traefik_ip:
+  - 10.24.3.6
+  - 10.24.3.3
+  - 10.25.3.4
+certbot_cloudflare_domains:
+  - k9e.no
+  - planetposen.no
+  - whoami.schleppe.cloud
