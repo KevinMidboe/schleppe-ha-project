@@ -1,1 +1,2 @@
-dns_cloudflare_api_token = {{ certbot_cloudflare_api_token }}
+# Managed by ansible
+dns_cloudflare_api_token = {{ lookup('ansible.builtin.env', 'CLOUDFLARE_API_KEY') }}

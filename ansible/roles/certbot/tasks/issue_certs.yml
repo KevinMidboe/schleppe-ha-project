@@ -1,0 +1,81 @@
+---
+- name: Read Cloudflare secrets directory from environment (invalid by default)
+  ansible.builtin.set_fact:
+    cloudflare_api_key: >-
+      {{ lookup('ansible.builtin.env', 'CLOUDFLARE_API_KEY')
+         | default('__CLOUDFLARE_API_KEY_NOT_SET__', true) }}
+  no_log: true
+
+- name: Fail if CLOUDFLARE_API_KEY is not set
+  ansible.builtin.assert:
+    that:
+      - cloudflare_api_key != '__CLOUDFLARE_API_KEY_NOT_SET__'
+    fail_msg: >
+      CLOUDFLARE_API_KEY environment variable is required
+
+- name: Validate dns_cloudflare_api_token looks sane
+  ansible.builtin.assert:
+    that:
+      - cloudflare_api_key is regex('[A-Za-z0-9]$')
+    fail_msg: >
+      must contain a valid
+      CLOUDFLARE_API_KEY = <alphanumeric>
+  no_log: false
+
+- name: Ensure certbot secrets directory exists
+  ansible.builtin.file:
+    path: "{{ certbot_secrets_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Write Cloudflare credential file
+  ansible.builtin.template:
+    src: cloudflare.ini.j2
+    dest: "{{ certbot_secrets_dir }}/certbot-cloudflare.ini"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Ensure combined cert output directory exists
+  ansible.builtin.file:
+    path: "{{ combined_certs_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+# Request/renew: certbot is already idempotent-ish. We guard with `creates` to avoid
+# re-issuing on first provision runs; renewals happen via cron/systemd timer (recommended).
+- name: Obtain certificate via certbot dns-cloudflare (first issuance)
+  ansible.builtin.command: >
+    certbot certonly
+    --agree-tos
+    --non-interactive
+    --email {{ certbot_email }}
+    --dns-cloudflare
+    --dns-cloudflare-credentials {{ certbot_secrets_dir }}/certbot-cloudflare.ini
+    -d {{ item }}
+    {% if certbot_use_staging %}--staging{% endif %}
+  args:
+    creates: "/etc/letsencrypt/live/{{ item }}/fullchain.pem"
+  loop: "{{ certbot_cloudflare_domains | default([]) }}"
+  register: certbot_issue
+  changed_when: certbot_issue.rc == 0
+  failed_when: certbot_issue.rc != 0
+  async: 0
+
+# Combine cert+key for Traefik/HAProxy-style PEM bundle
+- name: Combine fullchain + privkey into single PEM bundle
+  ansible.builtin.shell: |
+    set -euo pipefail
+    cat \
+      /etc/letsencrypt/live/{{ item }}/fullchain.pem \
+      /etc/letsencrypt/live/{{ item }}/privkey.pem \
+      > {{ combined_certs_dir }}/{{ combined_cert_prefix }}{{ item }}.pem
+    chmod 0600 {{ combined_certs_dir }}/{{ combined_cert_prefix }}{{ item }}.pem
+  args:
+    executable: /bin/bash
+  loop: "{{ certbot_cloudflare_domains | default([]) }}"

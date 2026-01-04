@@ -3,5 +3,5 @@
   hosts: haproxy
 
   roles:
-    # - role: roles/certbot
+    - role: roles/certbot
     - role: roles/haproxy

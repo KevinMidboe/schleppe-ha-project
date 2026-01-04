@@ -1,3 +1,13 @@
+certbot_email: kevin.midboe+ha.project@gmail.com
+certbot_secrets_dir: /root/.secrets/certbot
+combined_certs_dir: /etc/haproxy/certs
+combined_cert_prefix: "ssl-"
+
+# Set true while testing to avoid LE rate limits
+certbot_use_staging: false
+le_renewal_window_seconds: 2592000
+certbot_throttle: 1
+
 certbot_packages:
   - certbot
   - python3-certbot-dns-cloudflare
