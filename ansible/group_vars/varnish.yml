@@ -1,0 +1,7 @@
+varnish_major: 60lts
+varnish_cfg_path: /etc/varnish
+haproxy_traefik_port: 80
+haproxy_traefik_ip:
+  - 10.24.3.6
+  - 10.24.3.3
+  - 10.25.3.4

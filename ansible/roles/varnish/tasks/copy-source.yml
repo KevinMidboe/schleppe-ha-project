@@ -1,0 +1,46 @@
+---
+- file:
+    path: "/etc/varnish"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- template:
+    src: default.vcl.j2
+    dest: "{{ varnish_cfg_path }}/default.vcl"
+    owner: root
+    group: root
+    mode: "0644"
+#   validate: "haproxy -c -f %s"
+  notify: reload varnish
+
+- template:
+    src: vcl_deliver.vcl.j2
+    dest: "{{ varnish_cfg_path }}/vcl_deliver.vcl"
+    owner: root
+    group: root
+    mode: "0644"
+#   validate: "haproxy -c -f %s"
+  notify: reload varnish
+
+- file:
+    path: "/etc/varnish/includes"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- template:
+    src: includes/x-cache-header.vcl.j2
+    dest: "{{ varnish_cfg_path }}/includes/x-cache-header.vcl"
+    owner: root
+    group: root
+    mode: "0644"
+#   validate: "haproxy -c -f %s"
+  notify: reload varnish
+
+- service:
+    name: varnish
+    state: restarted
+

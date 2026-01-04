@@ -1,0 +1,43 @@
+sub vcl_recv {
+  unset req.http.X-Cache;
+}
+
+sub vcl_hit {
+  set req.http.X-Cache = "HIT";
+}
+
+sub vcl_miss {
+  set req.http.X-Cache = "MISS";
+}
+
+sub vcl_pass {
+  set req.http.X-Cache = "PASS";
+}
+
+sub vcl_pipe {
+  set req.http.X-Cache = "PIPE uncacheable";
+}
+
+sub vcl_synth {
+  set resp.http.X-Cache = "SYNTH";
+}
+
+sub vcl_deliver {
+  if (obj.uncacheable) {
+    set req.http.X-Cache = req.http.X-Cache + " uncacheable" ;
+  } else {
+    set req.http.X-Cache = req.http.X-Cache + " cached" + " (real age: " + resp.http.Age + ", hits: " + obj.hits + ", ttl: " + regsub(resp.http.x-ttl, "\..*", "") + ")";
+  }
+
+  # if we are gracing, make sure the browser doesn't cache things, and set our maxage to 1
+  # also log grace delivery
+  if (req.http.graceineffect) {
+    set resp.http.Cache-Control = regsub(resp.http.Cache-Control, "max-age=[0-9]*", "max-age=1");
+    set resp.http.Cache-Control = regsub(resp.http.Cache-Control, "channel-maxage=[0-9]*", "channel-maxage=1");
+    set req.http.X-Cache = req.http.X-Cache + " [grace: " + req.http.graceineffect + " " + req.http.grace + ", remaining: " + req.http.graceduration + "]";
+  }
+
+  # uncomment the following line to show the information in the response
+  set resp.http.X-Cache = req.http.X-Cache;
+}
+

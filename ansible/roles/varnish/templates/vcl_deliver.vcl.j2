@@ -1,0 +1,40 @@
+sub vcl_deliver {
+	# Happens when we have all the pieces we need, and are about to send the
+	# response to the client.
+
+	if (resp.status == 503) {
+		set resp.http.failing-backend = "true";
+	}
+
+	# Give some debug
+	if (req.http.X-debug && req.esi_level == 0) {
+		set resp.http.X-Backend = req.backend_hint;
+		set resp.http.X-Backend-Url = req.url;
+		set resp.http.X-Varnish-Server = server.hostname;
+    } else {
+		# not debug, strip some headers
+		unset resp.http.X-Cache;
+		unset resp.http.X-Backend;
+		unset resp.http.x-upstream;
+		unset resp.http.x-request-uri;
+		unset resp.http.Via;
+		unset resp.http.xkey;
+		unset resp.http.x-goog-hash;
+		unset resp.http.x-goog-generation;
+		unset resp.http.X-GUploader-UploadID;
+		unset resp.http.x-goog-storage-class;
+		unset resp.http.x-goog-metageneration;
+		unset resp.http.x-goog-stored-content-length;
+		unset resp.http.x-goog-stored-content-encoding;
+		unset resp.http.x-goog-meta-goog-reserved-file-mtime;
+		unset resp.http.Server;
+		unset resp.http.X-Apache-Host;
+		unset resp.http.X-Varnish-Backend;
+		unset resp.http.X-Varnish-Host;
+		unset resp.http.X-Nginx-Host;
+		unset resp.http.X-Upstream-Age;
+		unset resp.http.X-Retries;
+		unset resp.http.X-Varnish;
+  }
+}
+

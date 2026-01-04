@@ -1,0 +1,113 @@
+---
+- name: Ensure apt cache is up to date (pre)
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Debian only - ensure debian-archive-keyring is installed
+  ansible.builtin.apt:
+    name: debian-archive-keyring
+    state: present
+  when: ansible_facts.distribution == "Debian"
+
+- name: Ensure required tools are installed (curl, gnupg, apt-transport-https)
+  ansible.builtin.apt:
+    name:
+      - curl
+      - gnupg
+      - apt-transport-https
+    state: present
+
+# Packagecloud repo parameters:
+#   os  = "debian" or "ubuntu"
+#   dist = codename (e.g. bookworm, bullseye, focal, jammy, noble)
+# :contentReference[oaicite:1]{index=1}
+- name: Set packagecloud repo parameters
+  ansible.builtin.set_fact:
+    varnish_pkgcloud_os: "{{ 'ubuntu' if ansible_facts.distribution == 'Ubuntu' else 'debian' }}"
+    varnish_pkgcloud_dist: "bookworm"
+    # varnish_pkgcloud_dist: "{{ ansible_facts.distribution_release }}"
+
+# ---- apt >= 1.1 path (keyrings + signed-by) ----
+- name: Ensure /etc/apt/keyrings exists
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: Download packagecloud GPG key (ascii)
+  ansible.builtin.get_url:
+    url: https://packagecloud.io/varnishcache/varnish{{ varnish_major }}/gpgkey
+    dest: /tmp/varnishcache_varnish{{ varnish_major }}.gpgkey
+    mode: "0644"
+
+- name: Dearmor packagecloud key into /etc/apt/keyrings
+  ansible.builtin.command: >
+    gpg --dearmor -o /etc/apt/keyrings/varnishcache_varnish{{ varnish_major }}-archive-keyring.gpg
+    /tmp/varnishcache_varnish{{ varnish_major }}.gpgkey
+  args:
+    creates: /etc/apt/keyrings/varnishcache_varnish{{ varnish_major }}-archive-keyring.gpg
+
+- name: Ensure Sequoia crypto-policy directory exists
+  ansible.builtin.file:
+    path: /etc/crypto-policies/back-ends
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Allow SHA1 signatures for sequoia (packagecloud compatibility)
+  ansible.builtin.copy:
+    dest: /etc/crypto-policies/back-ends/sequoia.config
+    owner: root
+    group: root
+    mode: "0644"
+    backup: true
+    content: |
+      [hash_algorithms]
+      sha1 = "always"
+
+- name: Add Varnish 6.0 LTS repo
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/etc/apt/keyrings/varnishcache_varnish{{ varnish_major }}-archive-keyring.gpg] https://packagecloud.io/varnishcache/varnish60lts/{{ varnish_pkgcloud_os }}/ {{ varnish_pkgcloud_dist }} main"
+    filename: varnishcache_varnish{{ varnish_major }}
+    state: present
+
+- name: Add Varnish 6.0 LTS source repo (optional)
+  ansible.builtin.apt_repository:
+    repo: "deb-src [signed-by=/etc/apt/keyrings/varnishcache_varnish{{ varnish_major }}-archive-keyring.gpg] https://packagecloud.io/varnishcache/varnish60lts/{{ varnish_pkgcloud_os }}/ {{ varnish_pkgcloud_dist }} main"
+    filename: varnishcache_varnish{{ varnish_major }}
+    state: present
+  when:
+    - varnish_enable_deb_src | default(false)
+
+- name: Update apt cache (after adding repo)
+  ansible.builtin.apt:
+    update_cache: true
+
+- name: Install Varnish Cache 6.0 LTS
+  ansible.builtin.apt:
+    name: "{{ varnish_packages | default(['varnish']) }}"
+    state: present
+
+
+- name: Copy systemd template
+  become: true
+  ansible.builtin.template:
+    src: varnish-systemd.j2
+    dest: /lib/systemd/system/varnish.service
+    owner: root
+    mode: "0644"
+
+- name: Restart systemd daemon
+  become: true
+  ansible.builtin.systemd:
+    daemon_reload: yes
+
+- name: Reload varnish service
+  become: true
+  ansible.builtin.systemd:
+    name: varnish.service
+    state: reloaded
+
+

@@ -1,0 +1,206 @@
+vcl 4.1;
+
+import std;
+import directors;
+
+include "vcl_deliver.vcl";
+include "includes/x-cache-header.vcl";
+
+{% for ip in haproxy_traefik_ip %}
+backend bk_appsrv_static-{{ loop.index }} {
+	.host = "{{ ip }}";
+	.port = "{{ haproxy_traefik_port }}";
+	.connect_timeout = 3s;
+	.first_byte_timeout = 10s;
+	.between_bytes_timeout = 5s;
+	.probe = {
+	  .url = "/ping";
+		.expected_response = 404;
+		.timeout = 1s;
+		.interval = 3s;
+		.window = 2;
+		.threshold = 2;
+		.initial = 2;
+	}
+}
+
+{% endfor %}
+
+/*
+ * Who is allowed to PURGE
+ */
+acl purge {
+    "127.0.0.1";
+    "localhost";
+    # add your admin / app hosts here
+}
+
+sub vcl_init {
+	new vdir = directors.round_robin();
+{% for ip in haproxy_traefik_ip %}
+	vdir.add_backend(bk_appsrv_static-{{ loop.index }});
+{% endfor %}
+}
+
+sub vcl_recv {
+    ### Default options
+
+    # Health Checking
+    if (req.url == "/varnishcheck") {
+        return (synth(200, "health check OK!"));
+    }
+
+    # Set default backend
+    set req.backend_hint = vdir.backend();
+
+    # grace period (stale content delivery while revalidating)
+    set req.grace = 30s;
+
+    # Purge request
+    if (req.method == "PURGE") {
+        if (client.ip !~ purge) {
+            return (synth(405, "Not allowed."));
+        }
+        return (purge);
+    }
+
+    # Accept-Encoding header clean-up
+    if (req.http.Accept-Encoding) {
+        # use gzip when possible, otherwise use deflate
+        if (req.http.Accept-Encoding ~ "gzip") {
+            set req.http.Accept-Encoding = "gzip";
+        } elsif (req.http.Accept-Encoding ~ "deflate") {
+            set req.http.Accept-Encoding = "deflate";
+        } else {
+            # unknown algorithm, remove accept-encoding header
+            unset req.http.Accept-Encoding;
+        }
+
+        # Microsoft Internet Explorer 6 is well know to be buggy with compression and css / js
+        if (req.url ~ "\.(css|js)(\?.*)?$" && req.http.User-Agent ~ "MSIE 6") {
+            unset req.http.Accept-Encoding;
+        }
+    }
+
+    # Enable debug headers through query param
+    if (req.url ~ "(?i)debug=(true|yes|1)") {
+      set req.http.X-debug = true;
+    }
+
+    ### Per host/application configuration
+    # bk_appsrv_static
+    # Stale content delivery
+    if (std.healthy(req.backend_hint)) {
+        set req.grace = 30s;
+    } else {
+        set req.grace = 1d;
+    }
+
+    # Cookie ignored in these static pages
+    unset req.http.Cookie;
+
+    ### Common options
+    # Static objects are first looked up in the cache
+    if (req.url ~ "\.(png|gif|jpg|swf|css|js)(\?.*)?$") {
+        return (hash);
+    }
+
+    # Default: look for the object in cache
+    return (hash);
+}
+
+sub vcl_hash {
+    hash_data(req.url);
+
+    if (req.http.host) {
+        hash_data(req.http.host);
+    } else {
+        hash_data(server.ip);
+    }
+}
+
+/*
+ * Called after a successful PURGE
+ */
+sub vcl_purge {
+    return (synth(200, "Purged."));
+}
+
+sub vcl_backend_response {
+    # Stale content delivery
+    set beresp.grace = 1d;
+
+    # Hide Server information
+    unset beresp.http.Server;
+
+    # Store compressed objects in memory (gzip at fetch time)
+    # Varnish can deliver gunzipped/gzipped depending on client support
+    if (beresp.http.Content-Type ~ "(?i)(text|application)") {
+        set beresp.do_gzip = true;
+    }
+
+		###################
+    #   cache rules   #
+    ###################
+    # HTML pages → short cache or no cache
+    if (bereq.url ~ "\.html$") {
+        set beresp.ttl = 30s;         # Cache briefly
+        set beresp.uncacheable = true; # Or disable cache entirely
+    }
+
+    # JavaScript & CSS → long cache
+    if (bereq.url ~ "\.(js|css)$") {
+        set beresp.ttl = 1d;
+    }
+
+    # Images under /image/ → long cache
+    if (bereq.url ~ "^/images/.*\.(svg|png|jpe?g)$") {
+        set beresp.ttl = 1y;
+    }
+
+    # Favicons → long cache
+    if (bereq.url ~ "^/favicons/") {
+        set beresp.ttl = 1y;
+    }
+
+    # Fallback: ensure some cache
+    if (beresp.ttl <= 0s) {
+        set beresp.ttl = 22s;
+    }
+
+		set beresp.http.X-TTL = beresp.ttl;
+
+    # remove any cookie on static or pseudo-static objects
+    unset beresp.http.Set-Cookie;
+
+    return (deliver);
+}
+
+sub vcl_deliver {
+    # unset resp.http.Via;
+    unset resp.http.X-Varnish;
+
+    # Handle conditional request with ETag
+    if (
+        req.http.If-None-Match &&
+        req.http.If-None-Match == resp.http.ETag
+    ) {
+        return (synth(304));
+    }
+
+    return (deliver);
+}
+
+sub vcl_synth {
+		if (resp.status == 304) {
+        set resp.http.ETag = req.http.If-None-Match;
+        # set resp.http.Content-Length = "0";
+        return (deliver);
+    }
+
+    # Keep defaults; this replaces the old vcl_error.
+    # (Your old "obj.status == 751" special case isn't referenced anywhere
+    #  in the provided VCL, so it was dropped.)
+    return (deliver);
+}
+
